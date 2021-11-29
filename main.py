@@ -136,12 +136,22 @@ def to_byte_data(original_data):
 
 
 def send_to_port(port_name, send):
-    ser = serial.Serial(port_name)
-    ser.baudrate = 115200
-    for data in send:
-        ser.write(data)
-        # ser.read(15)
-    ser.close()
+    try:
+        ser = serial.Serial(port_name)
+        ser.baudrate = 115200
+        for data in send:
+            ser.write(data)
+        ser.close()
+    except serial.serialutil.SerialException:
+        popup_win = tk.Tk()
+        popup_win.wm_title("Error")
+
+        popup_msg = tk.Label(master=popup_win, text="COM3 port is not opened.")
+        popup_msg.pack(side=tk.TOP)
+
+        popup_btn = tk.Button(master=popup_win, text="OK", command=popup_win.destroy)
+        popup_btn.pack(side=tk.BOTTOM)
+
 
 
 def option_list_event(event):
@@ -190,13 +200,24 @@ def create_trajectory(points):
 
 def button_send_action():
 
-    trajectory = create_trajectory(trajectory_entry.get())
+    if selected_function.get() == "Select a function":
+        popup_win = tk.Tk()
+        popup_win.wm_title("Error")
 
-    movement_data = movement_data_create(trajectory, calculated_torques, int(amplitude_entry.get()), int(frequency_entry.get()))
+        popup_msg = tk.Label(master=popup_win, text="Select a trajectory function")
+        popup_msg.pack(side=tk.TOP)
 
-    send_data = to_byte_data(movement_data)
+        popup_btn = tk.Button(master=popup_win, text="OK", command=popup_win.destroy)
+        popup_btn.pack(side=tk.BOTTOM)
 
-    send_to_port("COM3", send_data)
+    else:
+        trajectory = create_trajectory(trajectory_entry.get())
+
+        movement_data = movement_data_create(trajectory, calculated_torques, int(amplitude_entry.get()), int(frequency_entry.get()))
+
+        send_data = to_byte_data(movement_data)
+
+        send_to_port("COM3", send_data)
 
 
 if __name__ == '__main__':
