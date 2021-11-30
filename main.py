@@ -8,7 +8,6 @@ from matplotlib.figure import Figure
 import numpy as np
 import tkinter as tk
 
-
 # adatszerkezet:
 #   byte[0:1]   2C 4D   header
 #   byte[2]     01      konstans
@@ -26,7 +25,6 @@ import tkinter as tk
 #   4: szinusz hiperbolikusz + köbös
 
 calculated_torques = []
-
 
 def torque_calculator(function=0, tolerance=0, const_value=3):
     torques = []
@@ -151,7 +149,6 @@ def send_to_port(port_name, send):
 
         popup_btn = tk.Button(master=popup_win, text="OK", command=popup_win.destroy)
         popup_btn.pack(side=tk.BOTTOM)
-
 
 
 def option_list_event(event):
