@@ -24,6 +24,7 @@ import tkinter as tk
 
 calculated_torques = []
 
+
 def torque_calculator(function=0, tolerance=0, const_value=3):
     torques = []
 
