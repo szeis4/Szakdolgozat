@@ -5,6 +5,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 import numpy as np
 import tkinter as tk
+from tkinter import messagebox
 
 # adatszerkezet:
 #   byte[0:1]   2C 4D   header
@@ -23,7 +24,6 @@ import tkinter as tk
 #   4: szinusz hiperbolikusz + köbös
 
 calculated_torques = []
-
 
 def torque_calculator(function=0, tolerance=0, const_value=3):
     torques = []
@@ -132,22 +132,59 @@ def to_byte_data(original_data):
     return byte_data
 
 
-def send_to_port(port_name, send):
+def send_to_port(port_name, send, mode):
     try:
+        pos_values = []
+        tor_values = []
         ser = serial.Serial(port_name)
         ser.baudrate = 115200
-        for data in send:
-            ser.write(data)
+        if mode == 1:
+            for data in send:
+                ser.write(data)
+        elif mode == 2:
+            data_for_read = [0x2c, 0x4d, 0x01, 0x00, 0x01, 255, 128]
+            for i in range(-180, 180):
+                data_for_read.append(0)
+            ser.write(data_for_read)
+            for i in range(500):
+                read_data = ser.read(15)
+                deg_top = read_data[7]
+                deg_low = read_data[8]
+                tor_top = read_data[11]
+                tor_low = read_data[12]
+                deg = int((deg_top << 8) + deg_low)
+                tor = int((tor_top << 8) + tor_low)
+                deg = deg - 180
+                pos_values.append(deg)
+                tor_values.append(tor)
+            t = np.arange(0, len(pos_values), 1)
+            position_figure.clear()
+            read_torque_figure.clear()
+            position_figure.add_subplot(111, title="Position").plot(t, pos_values)
+            read_torque_figure.add_subplot(111, title="Torque").plot(t, tor_values)
+            position_canvas.draw()
+            read_torque_canvas.draw()
+        elif mode == 3:
+            for data in send:
+                ser.write(data)
+                read_data = ser.read(15)
+                deg_top = read_data[7]
+                deg_low = read_data[8]
+                tor_top = read_data[11]
+                tor_low = read_data[12]
+                deg = int((deg_top << 8) + deg_low)
+                tor = int((tor_top << 8) + tor_low)
+                deg = deg - 180
+                pos_values.append(deg)
+                tor_values.append(tor)
+            t = np.arange(0, len(pos_values), 1)
+            position_figure.add_subplot(111, title="Position").plot(t, pos_values)
+            read_torque_figure.add_subplot(111, title="Torque").plot(t, tor_values)
+            position_canvas.draw()
+            read_torque_canvas.draw()
         ser.close()
     except serial.serialutil.SerialException:
-        popup_win = tk.Tk()
-        popup_win.wm_title("Error")
-
-        popup_msg = tk.Label(master=popup_win, text="COM3 port is not opened.")
-        popup_msg.pack(side=tk.TOP)
-
-        popup_btn = tk.Button(master=popup_win, text="OK", command=popup_win.destroy)
-        popup_btn.pack(side=tk.BOTTOM)
+        messagebox.showinfo("Error", port_name + " port is not opened.")
 
 
 def option_list_event(event):
@@ -184,66 +221,67 @@ def option_list_event(event):
 def create_trajectory(points):
     movement_trajectory = []
     stopping_points = points.split()
-    for i in range(0, len(stopping_points)-1):
-        if int(stopping_points[i]) > int(stopping_points[i+1]):
+    for i in range(0, len(stopping_points) - 1):
+        if int(stopping_points[i]) > int(stopping_points[i + 1]):
             step_dir = -1
         else:
             step_dir = 1
-        for j in range(int(stopping_points[i]), int(stopping_points[i+1]), step_dir):
+        for j in range(int(stopping_points[i]), int(stopping_points[i + 1]), step_dir):
             movement_trajectory.append(j)
     return movement_trajectory
 
 
 def button_send_action():
+    if radiobutton_var.get() == 1 or radiobutton_var.get() == 2 or radiobutton_var.get() == 3:
 
-    if selected_function.get() == "Select a function":
-        popup_win = tk.Tk()
-        popup_win.wm_title("Error")
+        if selected_function.get() == "Select a function":
 
-        popup_msg = tk.Label(master=popup_win, text="Select a trajectory function")
-        popup_msg.pack(side=tk.TOP)
+            messagebox.showinfo("Error", "Select a trajectory function!")
 
-        popup_btn = tk.Button(master=popup_win, text="OK", command=popup_win.destroy)
-        popup_btn.pack(side=tk.BOTTOM)
+        else:
+            trajectory = create_trajectory(trajectory_entry.get())
+
+            movement_data = movement_data_create(trajectory, calculated_torques, int(amplitude_entry.get()),
+                                                 int(frequency_entry.get()))
+
+            send_data = to_byte_data(movement_data)
+
+            send_to_port("COM3", send_data, radiobutton_var.get())
 
     else:
-        trajectory = create_trajectory(trajectory_entry.get())
 
-        movement_data = movement_data_create(trajectory, calculated_torques, int(amplitude_entry.get()), int(frequency_entry.get()))
-
-        send_data = to_byte_data(movement_data)
-
-        send_to_port("COM3", send_data)
+        messagebox.showinfo("Error", "Select an operation mode!")
+        print(radiobutton_var)
 
 
 if __name__ == '__main__':
-    # movement_trajectory_positions = []
-    # for i in range(91):
-    #     movement_trajectory_positions.append(i)
-    # for i in range(90, 45, -1):
-    #     movement_trajectory_positions.append(i)
-    #
-    # test_trajectory_positions = []
-    #
-    # for i in range(360):
-    #     test_trajectory_positions.append(i)
-    #     test_trajectory_positions.append(i)
-    #     test_trajectory_positions.append(i)
-    #     test_trajectory_positions.append(i)
-    #     test_trajectory_positions.append(i)
-    #
-    # move_data = movement_data_create(test_trajectory_positions)
-    # send_data = to_byte_data(move_data)
-
-    # create_gui()
-
-    # send_to_port("COM3", send_data)
-
     window = tk.Tk()
     window.title("Motor driver")
 
-    set_value_frame = tk.Frame(master=window)
-    set_value_frame.grid(row=0, column=0, padx=5, pady=5)
+    left_frame = tk.Frame(master=window)
+    left_frame.grid(row=0, column=0, padx=5, pady=5)
+
+    mode_selection_frame = tk.Frame(master=left_frame)
+    mode_selection_frame.grid(row=0, column=0, padx=5, pady=5)
+
+    selection_label = tk.Label(master=mode_selection_frame, text="Select the mode")
+    selection_label.grid(row=0, column=0, padx=5, pady=5)
+
+    radiobutton_frame = tk.Frame(master=mode_selection_frame)
+    radiobutton_frame.grid(row=1, column=0, padx=5, pady=5)
+
+    radiobutton_var = tk.IntVar(window)
+
+    write_radiobutton = tk.Radiobutton(master=radiobutton_frame, text="write", value=1, variable=radiobutton_var)
+    write_radiobutton.grid(row=0, column=0, padx=5, pady=5)
+    read_radiobutton = tk.Radiobutton(master=radiobutton_frame, text="read", value=2, variable=radiobutton_var)
+    read_radiobutton.grid(row=0, column=1, padx=5, pady=5)
+    read_write_radiobutton = tk.Radiobutton(master=radiobutton_frame, text="read-write", value=3,
+                                            variable=radiobutton_var)
+    read_write_radiobutton.grid(row=0, column=2, padx=5, pady=5)
+
+    set_value_frame = tk.Frame(master=left_frame)
+    set_value_frame.grid(row=1, column=0, padx=5, pady=5)
 
     trajectory_frame = tk.Frame(master=set_value_frame)
     trajectory_frame.grid(row=0, column=0, padx=5, pady=5)
@@ -292,8 +330,8 @@ if __name__ == '__main__':
     value_frame.columnconfigure(0, weight=1)
     value_frame.rowconfigure([0, 11], weight=1)
 
-    torque_function_frame = tk.Frame(master=window)
-    torque_function_frame.grid(row=1, column=0, padx=5, pady=5)
+    torque_function_frame = tk.Frame(master=left_frame)
+    torque_function_frame.grid(row=2, column=0, padx=5, pady=5)
     torque_function_label = tk.Label(master=torque_function_frame, text="Select the function for the torque correction")
     torque_function_label.pack(fill=tk.X)
     function_list = ['constant', 'linear', 'hyperbolic sine', 'cubic', 'hyperbolic sine + cubic']
@@ -307,16 +345,33 @@ if __name__ == '__main__':
     torque_canvas.draw()
     torque_canvas.get_tk_widget().pack(fill=tk.BOTH)
 
-    button_frame = tk.Frame(master=window)
-    button_frame.grid(row=2, column=0, padx=5, pady=5)
-    send_button = tk.Button(master=button_frame, text="SEND", command=button_send_action)
+    button_frame = tk.Frame(master=left_frame)
+    button_frame.grid(row=3, column=0, padx=5, pady=5)
+    send_button = tk.Button(master=button_frame, text="OPEN PORT", command=button_send_action)
     send_button.pack(fill=tk.BOTH)
     exit_button = tk.Button(master=button_frame, text="EXIT", command=window.destroy)
     exit_button.pack(fill=tk.BOTH)
 
-    window.columnconfigure(0, weight=1)
-    window.rowconfigure(0, weight=1)
-    window.rowconfigure(1, weight=1)
-    window.rowconfigure(2, weight=1)
+    left_frame.columnconfigure(0, weight=1)
+    left_frame.rowconfigure(0, weight=1)
+    left_frame.rowconfigure(1, weight=1)
+    left_frame.rowconfigure(2, weight=1)
+    left_frame.rowconfigure(3, weight=1)
+
+    right_frame = tk.Frame(master=window)
+    right_frame.grid(row=0, column=1, padx=5, pady=5)
+
+    right_column_label = tk.Label(master=right_frame, text="Figures of the read data")
+    right_column_label.grid(row=0, column=0, padx=5, pady=5)
+
+    position_figure = Figure()
+    position_canvas = FigureCanvasTkAgg(position_figure, master=right_frame)
+    position_canvas.draw()
+    position_canvas.get_tk_widget().grid(row=1, column=0, padx=5, pady=5)
+
+    read_torque_figure = Figure()
+    read_torque_canvas = FigureCanvasTkAgg(read_torque_figure, master=right_frame)
+    read_torque_canvas.draw()
+    read_torque_canvas.get_tk_widget().grid(row=2, column=0, padx=5, pady=5)
 
     window.mainloop()
